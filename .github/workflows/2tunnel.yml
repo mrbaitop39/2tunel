@@ -1,0 +1,44 @@
+name: RDP with Cloudflare Tunnel (Fix)
+
+on: [workflow_dispatch]
+
+jobs:
+  rdp:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup Desktop + RDP
+        run: |
+          sudo apt update
+          sudo apt install -y xfce4 xfce4-goodies xrdp
+          sudo systemctl enable xrdp
+          sudo systemctl start xrdp
+          sudo adduser rdpuser --disabled-password --gecos ""
+          echo "rdpuser:rdppassword" | sudo chpasswd
+          sudo usermod -aG sudo rdpuser
+
+      - name: Install cloudflared
+        run: |
+          wget https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+          sudo dpkg -i cloudflared-linux-amd64.deb || true
+
+      - name: Run Cloudflare Tunnel
+        run: |
+          echo "Starting tunnel..."
+          cloudflared tunnel --url tcp://localhost:3389 --logfile tunnel.log --loglevel info &
+          sleep 15
+          echo "Extracting tunnel link..."
+          cat tunnel.log | grep -o 'tcp://[^ ]*' > rdp-link.txt || echo "Link not found" > rdp-link.txt
+
+      - name: Print Access Info
+        run: |
+          echo "=========== RDP INFO ==========="
+          cat rdp-link.txt
+          echo "Username: rdpuser"
+          echo "Password: rdppassword"
+          echo "================================"
+
+      - name: Upload RDP Link
+        uses: actions/upload-artifact@v4
+        with:
+          name: rdp-link
+          path: rdp-link.txt
