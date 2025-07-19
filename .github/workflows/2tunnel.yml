@@ -1,13 +1,14 @@
-name: RDP with Cloudflare Tunnel (Full 6 Hours)
+name: RDP with Cloudflare Tunnel (Fixed)
 
 on: [workflow_dispatch]
 
 jobs:
   rdp:
     runs-on: ubuntu-latest
-    timeout-minutes: 360  # Maksimal 6 jam (default GitHub Actions)
+    timeout-minutes: 360
+
     steps:
-      - name: Install Desktop Environment & xrdp
+      - name: Setup Desktop + xRDP
         run: |
           sudo apt update
           sudo apt install -y xfce4 xfce4-goodies xrdp
@@ -17,18 +18,15 @@ jobs:
           echo "rdpuser:rdppassword" | sudo chpasswd
           sudo usermod -aG sudo rdpuser
 
-      - name: Install cloudflared
+      - name: Start Cloudflare Tunnel (TryCloudflare)
         run: |
-          wget https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
-          sudo dpkg -i cloudflared-linux-amd64.deb || true
-
-      - name: Start Cloudflare Tunnel
-        run: |
-          cloudflared tunnel --url tcp://localhost:3389 --logfile tunnel.log --loglevel info &
+          curl -L -o cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
+          chmod +x cloudflared
+          ./cloudflared tunnel --url tcp://localhost:3389 > tunnel.log 2>&1 &
           sleep 15
-          grep -o 'tcp://[^ ]*' tunnel.log > rdp-link.txt || echo "Link not found" > rdp-link.txt
+          grep -o 'tcp://[^ ]*' tunnel.log | head -n 1 > rdp-link.txt || echo "Link not found" > rdp-link.txt
 
-      - name: Print RDP Info
+      - name: Show RDP Info
         run: |
           echo "=========== 🔗 RDP LINK ==========="
           cat rdp-link.txt
@@ -37,16 +35,13 @@ jobs:
           echo "🔑 Password: rdppassword"
           echo "==================================="
 
-      - name: Upload RDP Link
+      - name: Upload Link
         uses: actions/upload-artifact@v4
         with:
           name: rdp-link
           path: rdp-link.txt
 
-      - name: Keep Session Alive (Max 6 Hours)
+      - name: Keep Session Alive (max 6h)
         run: |
-          echo "🕒 Keeping session alive for up to 6 hours..."
-          for i in {1..360}; do
-            echo "⏳ Minute $i - Still running..."
-            sleep 60
-          done
+          echo "🕒 Menjaga sesi tetap aktif 6 jam"
+          for i in {1..360}; do echo "Minute $i"; sleep 60; done
