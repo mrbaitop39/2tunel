@@ -1,12 +1,13 @@
-name: RDP with Cloudflare Tunnel (Fix)
+name: RDP with Cloudflare Tunnel (Full 6 Hours)
 
 on: [workflow_dispatch]
 
 jobs:
   rdp:
     runs-on: ubuntu-latest
+    timeout-minutes: 360  # Maksimal 6 jam (default GitHub Actions)
     steps:
-      - name: Setup Desktop + RDP
+      - name: Install Desktop Environment & xrdp
         run: |
           sudo apt update
           sudo apt install -y xfce4 xfce4-goodies xrdp
@@ -21,24 +22,31 @@ jobs:
           wget https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
           sudo dpkg -i cloudflared-linux-amd64.deb || true
 
-      - name: Run Cloudflare Tunnel
+      - name: Start Cloudflare Tunnel
         run: |
-          echo "Starting tunnel..."
           cloudflared tunnel --url tcp://localhost:3389 --logfile tunnel.log --loglevel info &
           sleep 15
-          echo "Extracting tunnel link..."
-          cat tunnel.log | grep -o 'tcp://[^ ]*' > rdp-link.txt || echo "Link not found" > rdp-link.txt
+          grep -o 'tcp://[^ ]*' tunnel.log > rdp-link.txt || echo "Link not found" > rdp-link.txt
 
-      - name: Print Access Info
+      - name: Print RDP Info
         run: |
-          echo "=========== RDP INFO ==========="
+          echo "=========== 🔗 RDP LINK ==========="
           cat rdp-link.txt
-          echo "Username: rdpuser"
-          echo "Password: rdppassword"
-          echo "================================"
+          echo "==================================="
+          echo "👤 Username: rdpuser"
+          echo "🔑 Password: rdppassword"
+          echo "==================================="
 
       - name: Upload RDP Link
         uses: actions/upload-artifact@v4
         with:
           name: rdp-link
           path: rdp-link.txt
+
+      - name: Keep Session Alive (Max 6 Hours)
+        run: |
+          echo "🕒 Keeping session alive for up to 6 hours..."
+          for i in {1..360}; do
+            echo "⏳ Minute $i - Still running..."
+            sleep 60
+          done
